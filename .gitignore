@@ -2,3 +2,5 @@
 # Written by Herdr into every installed mod folder
 gpui-kit.d.ts
 herdr.d.ts
+# Better Files keeps image copies here while a file tab is open
+mods/better-files/cache/

@@ -4,6 +4,7 @@ Backup of the Herdr setup made on 2026-11-07: the `main-plus` layout, whose stat
 system load and agent quota (two Claude accounts plus Codex), and whose pane headers show each
 Claude session's model, effort and context usage; plus the mods and the Claude Code hook it uses.
 Added 2026-11-13: the `reviewer` pane (see [Reviewer pane](#reviewer-pane)).
+Added 2026-11-15: four Better mods from munza/herdr-mods (see [Better mods](#better-mods)).
 
 Source: [Lakris2407/herdr-mods `quota/`](https://github.com/Lakris2407/herdr-mods/tree/main/quota)
 at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged from upstream;
@@ -11,11 +12,15 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 
 | Path | What it is |
 |---|---|
-| `layouts/main-plus.json` | Clone of Herdr's `main`; the status block is a row: `workspace-status` 1.6, `system` 1.6, `quota` 3.1; pane header mod `pane-plus` |
+| `layouts/main-plus.json` | Clone of Herdr's `main`; the status block is a row: `workspace-status` 1.6, `system` 1.6, `quota` 3.1; pane header mod `pane-plus`; right panel `better-files` / `better-changes` |
 | `mods/quota/` | The quota mod as installed (modified) |
 | `mods/system/` | The system load mod as installed (upstream, unchanged) |
 | `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text |
 | `mods/reviewer/` | Code-review pane from gfronza/herdr-app-reviewer (`dd69158`), unchanged; toggled with `cmd-r` |
+| `mods/better-files/`, `mods/better-changes/` | File browser and Git panel from munza/herdr-mods (`8606260`), in `main-plus`'s right panel; Better Changes' `mod.json` sets `limits.files: 300` |
+| `mods/better-config/` | Settings dialog for every mod with settings (same source), `cmd-alt-,` |
+| `mods/better-icons/` | Material Icon Theme icons used by Better Files and Better Changes (same source) |
+| `licenses/munza-herdr-mods/` | That repo's Apache-2.0 `LICENSE` and `NOTICE` |
 | `themes/catppuccin-frappe.json` | The app theme (`settings.json` `"theme"`), with panel colors pinned to Frappé |
 | `bin/claude-herdr-info` | Claude Code hook that feeds the header; installed at `~/.local/bin/` |
 | `quota.patch` | Upstream `mods/quota` → installed, `patch -p1` |
@@ -33,13 +38,18 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 
 ```sh
 H=~/.config/herdr-app
-cp -R mods/quota mods/system mods/pane-plus mods/reviewer "$H/mods/"   # check they don't exist first
+# Layout first: better-changes has "place": "right", and Herdr docks a copy of a mod it has
+# never seen into the shown layout unless a layout already uses it.
 cp layouts/main-plus.json "$H/layouts/"
+cp -R mods/quota mods/system mods/pane-plus mods/reviewer "$H/mods/"   # check they don't exist first
+cp -R mods/better-icons mods/better-config mods/better-files mods/better-changes "$H/mods/"
 cp themes/catppuccin-frappe.json "$H/themes/"     # settings.json: "theme": "catppuccin-frappe"
 install -m 755 bin/claude-herdr-info ~/.local/bin/
 # keys.json, under "global":  "cmd-r": "mod.open:reviewer",
+#   "cmd-alt-,": "mod.open:better-config",  "cmd-alt-g": "mod.open:better-changes",
 herdr-app check "$H/mods/quota" && herdr-app check "$H/mods/system" && herdr-app check "$H/mods/pane-plus"
 herdr-app check "$H/mods/reviewer"
+for m in better-icons better-config better-files better-changes; do herdr-app check "$H/mods/$m"; done
 herdr-app do layout.switch '{"name":"main-plus"}'
 herdr-app status                                 # "errors": []
 ```
@@ -133,6 +143,53 @@ developing it. Herdr adds its own `gpui-kit.d.ts` to the installed folder; it is
   repo's 89 tests pass.
 - To update: re-clone, `diff -r` its `mods/reviewer` against this copy, check new `exec`/`run`
   calls, then replace both (keep `gpui-kit.d.ts` in the installed one).
+
+## Better mods
+
+`mods/better-icons`, `better-config`, `better-files` and `better-changes` are from
+[munza/herdr-mods](https://github.com/munza/herdr-mods) at commit
+`860626068cb7e32a1db96b2f66baadc271d5667a` (2026-11-14), copied as is (Apache-2.0, kept in
+`licenses/munza-herdr-mods/`; the icons are MIT, licence in `mods/better-icons/`). The only
+change is the `settings` block in `mods/better-changes/mod.json` (see Watch out). Only the
+`mods/<name>/` folders are installed; the repo's tests, `sync.sh` and recipes are for developing them.
+
+- **Better Files** (`files` block) and **Better Changes** (`changes` block) fill `main-plus`'s
+  right panel, the `panel-body` stack. The block ids are Herdr's, so the tab bar's Files and
+  Changes buttons switch between them. Those buttons show only for the ids in shared
+  `"workspace.panels"`, which the welcome screen had left `[]`; it is now `["files","changes"]`
+  (on a new install: `herdr-app do app.welcome` and turn both on). `cmd-alt-g` opens Changes.
+- **Better Config** opens with `cmd-alt-,`: a dialog with every mod's settings, which writes
+  only changed keys into the mod's `mod.json`. It also keeps a copy of changed values in
+  `~/.config/herdr-mods/better-config/<mod>.json` (not backed up; `mod.json` here is the
+  source) and offers to restore them after an update resets `mod.json`.
+- **Better Icons** draws nothing: the other two read its icons by path (5.8 MB, 1,184 SVGs).
+- Audited on install. None reaches the network (Markdown and commit links open in the browser
+  when clicked). Better Icons runs nothing and reads only its folder. Better Config runs
+  `sh -c ls` and `mkdir -p` and reads every mod's `mod.json` and `mod.schema.json`. Better Files
+  runs `sh` (folder listing), read-only `git status`/`git diff -U0 HEAD` with
+  `--no-optional-locks`, `mdfind` (finding editors), `open` (Open in, Finder), `cp`/`rm` of
+  image copies in its own `cache/`, and `hc send` / `hc run --bg --parent` only on Send in its
+  "Send to agent" box. Better Changes runs only `git`: reads with `--no-optional-locks`,
+  `core.fsmonitor=false`, `--no-ext-diff --no-textconv`; on a click, stage/unstage
+  (`git add`, `git reset -q HEAD`, `git rm --cached`: index only) and `git commit [--amend] -m`.
+  It never fetches or pushes. App commands: `tab.new`, `tab.select`, `tab.rename`,
+  `pane.focus`, `app.settings`.
+
+**Watch out:**
+
+- Better Changes draws its whole file list on every render (not a virtual list). Over Herdr's
+  render time limit, the panel shows "This view could not be re-rendered; showing the last
+  version that worked — interrupted" and stays on "Loading changes…". It counts every untracked
+  file (`--untracked-files=all`): a repo with 2,197 untracked files failed at the default
+  `limits.files` 1,000 and worked at 500, so it is set to 300 for headroom.
+- Diff and file tabs have two header rows: `pane-plus`, then the mod's own file row. One row
+  needs the mods' own pane header (`better-changes`), which has no Claude info; using `pane-plus`
+  instead would mean reading `shared("pane-heads")` in it and patching the
+  `=== "better-changes"` header check in `better-files/views/viewer.js` and
+  `better-changes/views/diff.js`.
+- To update: re-clone, `diff -r` each `mods/<name>` against this copy, check new `exec`, `hc`
+  and `run` calls, then replace both. Copying a new `mod.json` drops `limits.files`; Better
+  Config offers to restore it.
 
 ## Theme: Catppuccin Frappé
 
