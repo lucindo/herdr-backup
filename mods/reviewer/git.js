@@ -88,13 +88,22 @@ async function mapInWaves(items, fn) {
   return out;
 }
 
-/** Commit ids; a null `to` is the working tree. @typedef {{ from: string, to: string | null }} Range */
+/**
+ * Commit or tree ids; a null `to` is the working tree. `objects` is a private object folder that
+ * holds the trees of a turn snapshot.
+ * @typedef {{ from: string, to: string | null, objects?: string }} Range
+ */
+
+// git reads an alternate object folder but never writes to it. Quoted, since the list splits on ":".
+export const alternates = (dir) => `GIT_ALTERNATE_OBJECT_DIRECTORIES="${dir.replace(/[\\"]/g, "\\$&")}"`;
+const withObjects = (exec, range) => (range?.objects ? (cmd, args, opts) => exec("env", [alternates(range.objects), cmd, ...args], opts) : exec);
 
 /**
  * Without a range, every uncommitted change; with one, the diff across that range.
  * @param {Range} [range]
  */
 export async function listChanges(root, exec, readText, range) {
+  exec = withObjects(exec, range);
   const head = range ? true : await hasHead(root, exec);
   const [codes, stats] = await Promise.all([
     range ? readRangeStatus(root, range, exec) : readStatus(root, exec),
@@ -164,6 +173,7 @@ function parseDiff(out) {
 
 /** @param {Range} [range] */
 export async function fileDiff(root, file, exec, readText, range) {
+  exec = withObjects(exec, range);
   if (file.untracked || (!range && !(await hasHead(root, exec)))) {
     const text = await readText(`${root}/${file.path}`);
     if (text === null) return UNREADABLE;
@@ -174,4 +184,25 @@ export async function fileDiff(root, file, exec, readText, range) {
   const rows = parseDiff(out);
   if (!rows.length && /^Binary files /m.test(out)) return BINARY;
   return capRows(rows);
+}
+
+// readTextFile's limit, in bytes.
+const MAX_TEXT = 1024 * 1024;
+
+// The blob's size in bytes is asked first, so a large file is never read whole.
+async function blobText(root, object, exec) {
+  const size = await exec("git", [...READ, "cat-file", "-s", object], { cwd: root });
+  if (size.code !== 0 || Number(size.stdout) > MAX_TEXT) return null;
+  const blob = await exec("git", [...READ, "cat-file", "blob", object], { cwd: root });
+  return blob.code === 0 ? blob.stdout : null;
+}
+
+/**
+ * A file's text at the end of `range`, read from disk when that end is the working tree; null when
+ * it is gone there, binary, or over 1 MiB.
+ * @param {Range} [range]
+ */
+export async function fileText(root, path, exec, readText, range) {
+  const text = range?.to ? await blobText(root, `${range.to}:${path}`, withObjects(exec, range)) : await readText(`${root}/${path}`);
+  return isBinary(text) ? null : text;
 }

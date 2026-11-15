@@ -16,7 +16,7 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 | `mods/quota/` | The quota mod as installed (modified) |
 | `mods/system/` | The system load mod as installed (upstream, unchanged) |
 | `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text |
-| `mods/reviewer/` | Code-review pane from gfronza/herdr-app-reviewer (`dd69158`), unchanged; toggled with `cmd-r` |
+| `mods/reviewer/` | Code-review pane from gfronza/herdr-app-reviewer (`71eb4b5`), unchanged; toggled with `cmd-r` |
 | `mods/better-files/`, `mods/better-changes/` | File browser and Git panel from munza/herdr-mods (`8606260`), in `main-plus`'s right panel; Better Changes' `mod.json` sets `limits.files: 300` |
 | `mods/better-config/` | Settings dialog for every mod with settings (same source), `cmd-alt-,` |
 | `mods/better-icons/` | Material Icon Theme icons used by Better Files and Better Changes (same source) |
@@ -119,28 +119,50 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 ## Reviewer pane
 
 `mods/reviewer` is [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer)
-at commit `dd691587ba7c8721356145918b6776144344dc7e` (2026-11-13), copied as is (MIT). Only the
+at commit `71eb4b545d6da745af1efa5358a1e8c1fb356e09` (2026-11-14), copied as is (MIT). Only the
 mod folder is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for
 developing it. Herdr adds its own `gpui-kit.d.ts` to the installed folder; it isn't backed up.
 
 - `cmd-r` (in `keys.json` `"global"`, after `cmd-p`) opens a pane right of the focused pane,
   bound to that pane's folder, listing its uncommitted changes as a diff; `cmd-r` again closes it.
   In the pane: `j`/`k`, `c` comment, `v` select lines, `y` copy the review, `s` paste it into
-  the tab's agent (no Enter), `l` stacked / side by side. Full key list in its README.
+  the tab's agent (no Enter), `l` stacked / side by side, `w` old beside new, `z` tree / flat
+  file list, `m` rendered Markdown, `/` `n` `N` find in the diff, `p` go to a file, `P` search
+  changed lines. Full key list in its README.
 - Scopes: `u` uncommitted (the default in every new pane), `b` the branch against its base (a
-  local branch: `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`), `g` one
-  commit or a run. `B` picks the base, `G` picks commits (Shift+Enter marks a run's first end).
-  Comments belong to the scope they were made in. Clicking a repo's name collapses its files.
-- Runs only read-only `git` (`status`, `diff`, `ls-files`, `rev-parse`, `merge-base`, `log`,
-  `for-each-ref`, `config` to read `init.defaultBranch`, and `hash-object -t tree /dev/null`
-  without `-w` for a root commit's empty tree), with `--no-optional-locks`, no index refresh;
-  no network. Shared-state keys: `reviewer.watch` (watched folders), `reviewer.layout`, and
-  `reviewer.bases` (picked base per repo).
+  local branch: `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`), `t` the
+  agent's last turn, `g` one commit or a run. `B` picks the base, `G` picks commits
+  (Shift+Enter marks a run's first end). `o` (This session) narrows any scope to the files the
+  agents' turns changed since the pane opened. Comments belong to the scope they were made in.
+- The diff views run only read-only `git` (`status`, `diff`, `ls-files`, `rev-parse`,
+  `merge-base`, `log`, `for-each-ref`, `cat-file` for rendering Markdown at a commit, `config` to
+  read `init.defaultBranch`, and `hash-object -t tree /dev/null` without `-w` for a root commit's
+  empty tree), with `--no-optional-locks`, no index refresh; no network. Shared-state keys:
+  `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
+  repo), `reviewer.files` (tree or flat) and `reviewer.diff` (unified or split).
+- **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
+  idle → working edge of its tab's agents snapshots every watched repo, whatever the scope: it
+  copies `.git/index` into `$TMPDIR/herdr-reviewer-<tab id>/turn-N/` and runs `git add -A` and
+  `git write-tree` there with `GIT_INDEX_FILE` and `GIT_OBJECT_DIRECTORY` pointing at it, hooks,
+  split index and clean filters (git-lfs) off. It also runs `sh`, `cp`, `find`, `mkdir` and `rm`
+  on that folder only. A turn's end snapshots again, and so does every refresh (each file change,
+  and every 10 s) while the Last turn scope or This session is on. It keeps the latest turn and
+  turns with unsent comments; a closed pane's folder is left for the system's temp cleanup.
+- **Watch out:** every snapshot rehashes all untracked files, and each turn's first one stores
+  them. On the translations repo (`~/Code/books/dharma-pujadi-mimangsa`, 416 MB of untracked
+  images under `diary/work/`) a turn's first snapshot took 11 s and wrote 395 MB to `$TMPDIR`,
+  later ones 1 s each, and nothing under `.git` changed. Keep the reviewer closed in such a tab,
+  or gitignore that data. A long snapshot also makes Last turn report "files changed just as the
+  turn started" when the agent writes during it.
 - Audited on install: `vendor/highlight.min.js` is byte-identical to highlight.js 11.12.0's
   published ES build (sha256 `1ed8fc52…9999d7`).
 - Updated 2026-11-13 from `52b9dd6` (branch and commits scopes, collapsible repos). Re-audited:
   `vendor/` unchanged, the new `revs.js` only calls `git` with the read-only flags above, and the
   repo's 89 tests pass.
+- Updated 2026-11-15 from `dd69158` (v1.2 last turn and this session; v1.3 file tree, split diff,
+  Markdown, find, file and code search). Re-audited: `vendor/` unchanged, new programs only in
+  `turns.js` as above, app commands unchanged (`pane.split`, `pane.focus`, `pane.close`,
+  `terminal.paste`), and the repo's 151 tests pass.
 - To update: re-clone, `diff -r` its `mods/reviewer` against this copy, check new `exec`/`run`
   calls, then replace both (keep `gpui-kit.d.ts` in the installed one).
 
