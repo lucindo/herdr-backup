@@ -1,0 +1,261 @@
+diff -ru a/main.js b/main.js
+--- a/main.js	2026-11-07 16:08:34
++++ b/main.js	2026-11-07 16:08:34
+@@ -4,14 +4,20 @@
+ import { roles, level, readable } from "./colors.js";
+ import { View, div, svg, image } from "gpui-kit";
+ import { h_flex, v_flex } from "gpui-base";
+-import { runQuotaCommand, copilotWindows } from "./quota-command.js";
+-import { exec, theme, settings, shared, setShared, props, openOverlay, knownAgents, nextCommand, spaces, run } from "herdr";
++import { runQuotaCommand, QUOTA_LINE } from "./quota-command.js";
++import { exec, home, theme, settings, shared, setShared, props, openOverlay, knownAgents, nextCommand, spaces, run } from "herdr";
+ 
+-const EVERY = 120000, STALE = 10 * 60000;
+-const DEFAULTS = { kinds: { session: true, weekly: true, monthly: true, model: false }, hidden: [], signedOut: false, names: false, remaining: false };
++// quota-axi's own live view reads every 5 minutes; Claude's usage endpoint rate-limits faster polling.
++const EVERY = 5 * 60000, STALE = 10 * 60000;
++const DEFAULTS = { kinds: { session: true, weekly: true, monthly: true, model: false, credits: true }, hidden: [], signedOut: false, names: false, remaining: false };
+ const ICONS = { claude: "claude", codex: "codex", grok: "grok", kimi: "kimi", copilot: "copilot", cursor: "cursor" };
+ const TINT = { claude: "#d97757", kimi: "#1783ff", copilot: "#8f6bf2" };
+-const KINDS = [["session", "5-hour limit"], ["weekly", "Weekly limit"], ["monthly", "Monthly limit"], ["model", "Model limits"]];
++const KINDS = [["session", "5-hour limit"], ["weekly", "Weekly limit"], ["monthly", "Monthly limit"], ["model", "Model limits"], ["credits", "Spend caps"]];
++// quota-axi 0.1.x omits windowSeconds; these windows have fixed lengths, and the pace tick needs one.
++const SPAN = { session: 5 * 3600, weekly: 7 * 86400 };
++// Extra Claude config dirs under home, on this computer only. quota-axi adds the default ~/.claude itself:
++// listing it too adds a broken lane that looks for a hashed Keychain entry.
++const CLAUDE_PROFILES = [".claude-personal"];
+ 
+ // Layout props set the starting options (`{"mod": "quota", "props": {"hidden": ["cursor"]}}`); the popup's choices win.
+ function options() {
+@@ -26,6 +32,7 @@
+ // Two windows of one kind (Cursor's monthly ones) are told apart by their own label.
+ function short(w, twin) {
+   if (twin) return (w.label ?? w.kind).split(" ")[0].slice(0, 6);
++  if (w.kind === "credits") return "spend";
+   if (w.kind === "session") return w.windowSeconds ? `${Math.round(w.windowSeconds / 3600)}h` : "5h";
+   if (w.kind === "weekly") return "wk";
+   if (w.kind === "monthly") return "mo";
+@@ -58,6 +65,9 @@
+   return { diff, ahead: diff >= 10 && w.percentUsed >= 20 };
+ }
+ 
++const usd = n => `$${n.toFixed(2).replace(/\.00$/, "")}`;
++const spend = w => Number.isFinite(w.spentUsd) && Number.isFinite(w.limitUsd) ? `${usd(w.spentUsd)} of ${usd(w.limitUsd)}` : null;
++
+ const percent = (w, remaining) => remaining && !w.shareOf ? 100 - w.percentUsed : w.percentUsed;
+ const percentText = (w, remaining) => `${Math.round(percent(w, remaining))}% ${remaining && !w.shareOf ? "remaining" : "used"}`;
+ 
+@@ -70,28 +80,50 @@
+ }
+ 
+ async function load(on = null) {
+-  let r = await runQuotaCommand(exec, { on }).catch(e => ({ code: -1, stderr: String(e) }));
++  // exec takes no environment, so `env` sets it for both attempts below.
++  const profiles = `QUOTA_AXI_CLAUDE_PROFILES=${CLAUDE_PROFILES.map(d => `${home()}/${d}`).join(":")}`;
++  const quotaExec = on == null ? (cmd, args, o) => exec("env", [profiles, cmd, ...args], o) : exec;
++  let r = await runQuotaCommand(quotaExec, { on }).catch(e => ({ code: -1, stderr: String(e) }));
+   // Apps started from the Dock miss PATH entries set in the shell's rc file (npm, nvm, mise): ask the person's own shell.
+-  if (r.code !== 0) r = await exec("sh", ["-c", 'exec "${SHELL:-/bin/sh}" -lic "quota-axi --json" </dev/null'], { on }).catch(e => ({ code: -1, stderr: String(e) }));
++  if (r.code !== 0) r = await quotaExec("sh", ["-c", `exec "\${SHELL:-/bin/sh}" -lic "${QUOTA_LINE}" </dev/null`], { on }).catch(e => ({ code: -1, stderr: String(e) }));
+   if (r.code !== 0) throw new Error(`quota-axi failed: ${(r.stderr || "").trim().split("\n").pop() || `exit ${r.code}`}`);
+   // An interactive shell can print a banner first; the report starts at the first brace.
+   const data = JSON.parse(r.stdout.slice(r.stdout.indexOf("{")));
+-  const providers = (data.providers ?? []).map(p => ({
+-      id: p.provider, label: p.label ?? p.provider, plan: p.plan ?? null, status: p.state?.status ?? null,
++  const raw = data.providers ?? [];
++  // Two accounts of one provider (two Claude profiles) come as two entries, told apart by accountKey and named by plan.
++  const twins = id => raw.filter(p => p.provider === id).length > 1;
++  const providers = raw.map(p => {
++    const label = p.label ?? p.provider, lane = twins(p.provider) ? p.plan ?? p.accountKey?.slice(-6) ?? null : null;
++    return {
++      id: p.provider, key: lane ? `${p.provider}:${p.accountKey}` : p.provider, lane, title: lane ? `${label} ${lane}` : label,
++      label, plan: p.plan ?? null, status: p.state?.status ?? null,
+       windows: (p.windows ?? []).map(w => ({
+         id: w.id, label: w.label, kind: w.kind, shareOf: w.shareOf ?? null,
+         // Newer quota-axi reports remaining percentages; shares are not independent allowances.
+         percentUsed: Number.isFinite(w.percentUsed) ? w.percentUsed
+           : w.shareOf == null && Number.isFinite(w.percentRemaining) ? 100 - w.percentRemaining : null,
+-        resetsAt: w.resetsAt ?? null, windowSeconds: w.windowSeconds ?? null,
++        resetsAt: w.resetsAt ?? null, windowSeconds: w.windowSeconds ?? SPAN[w.kind] ?? null,
++        spentUsd: w.spentUsd ?? null, limitUsd: w.limitUsd ?? null,
+       })).filter(w => Number.isFinite(w.percentUsed)),
+-    }));
+-  // This computer only: gh on a remote machine would need its own login there.
+-  const copilot = on == null ? providers.find(p => p.id === "copilot" && !p.windows.length) : null;
+-  if (copilot) copilot.windows = (await copilotWindows(exec)) ?? [];
+-  return { at: Date.now(), providers };
++    };
++  });
++  // quota-axi reports Retry-After but does not wait for it; asking sooner only prolongs the limit.
++  const retryAfter = Math.max(0, ...raw.map(p => Date.parse(p.state?.retryAfter ?? "") || 0));
++  return { at: Date.now(), retryAfter, providers };
+ }
+ 
++// A rate-limited or failing account keeps its last good reading, dimmed, so its only figure does not vanish
++// for a read. A signed-out one does not: its old numbers no longer apply.
++function keepLastGood(data, prev) {
++  const before = new Map((prev?.providers ?? []).map(p => [p.key, p]));
++  return { ...data, providers: data.providers.map(p => {
++    const last = before.get(p.key);
++    return p.status !== "fresh" && p.status !== "auth_required" && last?.windows.length
++      ? { ...last, status: p.status, held: true }
++      : { ...p, at: data.at };
++  }) };
++}
++
+ export default class Quota extends View {
+   init(_props, cx) {
+     // The app's program table knows each agent's icon and whether it is a one-color glyph.
+@@ -140,10 +172,15 @@
+ 
+   refresh(cx) {
+     const on = quotaMachine();
+-    if (this.loading.has(on)) return;
++    if (this.loading.has(on) || Date.now() < (shared(stateKey("quota.data", on))?.retryAfter ?? 0)) return;
+     this.loading.add(on);
+     cx.spawn(async cx => {
+-      try { setShared(stateKey("quota.data", on), await load(on)); setShared(stateKey("quota.error", on), null); }
++      try {
++        // Read the previous data after the await: another copy may have stored newer data meanwhile.
++        const data = await load(on);
++        setShared(stateKey("quota.data", on), keepLastGood(data, shared(stateKey("quota.data", on))));
++        setShared(stateKey("quota.error", on), null);
++      }
+       catch (e) { setShared(stateKey("quota.error", on), String(e.message ?? e)); }
+       finally { this.loading.delete(on); cx.notify(); }
+     });
+@@ -151,7 +188,7 @@
+ 
+   openMenu() {
+     const data = shared(stateKey("quota.data")), o = options();
+-    const all = data?.providers ?? [], shown = all.filter(p => !o.hidden.includes(p.id) && (signedIn(p) || o.signedOut));
++    const all = data?.providers ?? [], shown = all.filter(p => !o.hidden.includes(p.key) && (signedIn(p) || o.signedOut));
+     const details = shown.reduce((n, p) => n + 30 + p.windows.length * 42, 0);
+     const toggles = (KINDS.length + all.length + 3 + (all.some(p => p.id === "agy") ? 1 : 0)) * 32;
+     openOverlay({ mod: "quota", kind: "popup", width: 300, height: Math.min(720, 44 + details + 40 + toggles + 77), props: { menu: true, machine: quotaMachine(), start: props() ?? {} } });
+@@ -165,22 +202,27 @@
+     if (on !== this.machine) { this.machine = on; this.refresh(cx); }
+     const data = shared(stateKey("quota.data")), error = shared(stateKey("quota.error")), o = options(), now = Date.now();
+     const stale = !data || now - data.at > STALE;
+-    const list = (data?.providers ?? []).filter(p => !o.hidden.includes(p.id) && (signedIn(p) || o.signedOut));
++    const list = (data?.providers ?? []).filter(p => !o.hidden.includes(p.key) && (signedIn(p) || o.signedOut));
+     // Narrow status bar: shorter bars, then no bars, then percents only, so every provider shows.
+     // The window label goes last: "25%" alone does not say which limit it is.
+     const width = this.width ?? Infinity, need = list.reduce((n, p) => n + p.windows.filter(x => o.kinds[x.kind] ?? false).length, 0);
+-    const per = need ? (width - 24 - list.length * 46) / need : Infinity;
++    // Twin accounts' plan names (see `name` below) take room too, about 6.5 px a character.
++    const lanes = list.reduce((n, p) => n + (p.lane ? 5 + p.lane.length * 6.5 : 0), 0);
++    const per = need ? (width - 24 - list.length * 46 - lanes) / need : Infinity;
+     const barW = per >= 96 ? 34 : per >= 76 ? 20 : 0, labels = per >= 40;
+     const parts = [], spoken = [];
+     list.forEach((p, i) => {
+       if (i > 0) parts.push(div().w(1).h(12).flex_none().bg(t.border));
+       const windows = visibleWindows(p, o).filter(w => o.kinds[w.kind] ?? false);
+-      spoken.push(windows.length ? `${p.label} ${windows.map(w => `${w.label} ${percentText(w, o.remaining)}`).join(", ")}` : `${p.label} not signed in`);
+-      parts.push(h_flex().id(`q-${p.id}`).gap(labels ? 9 : 6).items_center().flex_none()
+-        .tooltip(windows.map(w => `${p.label} ${w.label}: ${percentText(w, o.remaining)}${w.resetsAt && Date.parse(w.resetsAt) > now ? `, resets in ${until(w.resetsAt, now)}` : ""}`).join("\n") || `${p.label}: not signed in`)
++      spoken.push(windows.length ? `${p.title} ${windows.map(w => `${w.label} ${percentText(w, o.remaining)}`).join(", ")}` : `${p.title} not signed in`);
++      // Twin accounts share an icon, so their plan names them even with names off.
++      const name = o.names || !ICONS[p.id] ? p.title : p.lane;
++      parts.push(h_flex().id(`q-${p.key}`).gap(labels ? 9 : 6).items_center().flex_none()
++        .tooltip(windows.map(w => `${p.title} ${w.label}: ${percentText(w, o.remaining)}${spend(w) ? `, ${spend(w)}` : ""}${w.resetsAt && Date.parse(w.resetsAt) > now ? `, resets in ${until(w.resetsAt, now)}` : ""}`).join("\n") + (p.held ? `\nLast read ${ago(p.at, now)} (${p.status?.replace("_", " ")})` : "") || `${p.title}: not signed in`)
++        .when(Boolean(p.held), el => el.opacity(0.6))
+         .child(h_flex().gap(5).items_center()
+           .child(this.glyph(p, 12, t))
+-          .when(o.names || !ICONS[p.id], el => el.child(div().text_color(signedIn(p) ? r.sub : r.hint).child(p.label))))
++          .when(Boolean(name), el => el.child(div().text_color(signedIn(p) ? r.sub : r.hint).child(name))))
+         .when(!signedIn(p), el => el.child(div().size(6).rounded(3).border_1().border_color(r.hint)))
+         .children(windows.map(w => {
+           const pc = pace(w, now);
+@@ -214,20 +256,21 @@
+       .child(div().size(16).flex_none().flex().items_center().justify_center()
+         .when(on, el => el.child(svg("mods/quota/check.svg").size(16).text_color(t.accent))));
+     const heading = text => div().px(8).pt(10).pb(4).text_size(11).text_color(r.hint).child(text);
+-    const details = all.filter(p => !o.hidden.includes(p.id) && (signedIn(p) || o.signedOut)).map(p => v_flex().px(8).py(4).gap(4)
++    const details = all.filter(p => !o.hidden.includes(p.key) && (signedIn(p) || o.signedOut)).map(p => v_flex().px(8).py(4).gap(4)
+       .child(h_flex().gap(6).items_center()
+         .child(this.glyph(p, 13, t))
+         .child(div().font_semibold().text_color(t.foreground).child(p.label))
+-        .child(div().text_size(11).text_color(r.hint).child(signedIn(p) ? (p.plan ?? "") : "not signed in")))
++        .child(div().text_size(11).text_color(r.hint).child(!signedIn(p) ? "not signed in" : p.held ? `${p.plan ?? ""} · read ${ago(p.at, now)}, ${p.status?.replace("_", " ")}` : p.plan ?? "")))
+       .children(visibleWindows(p, o).map(w => {
+         const pc = pace(w, now);
+         return v_flex().gap(3)
+           .child(h_flex().gap(8).items_center()
+-            .child(div().w(62).flex_none().truncate().text_size(12).text_color(r.sub).child(w.kind === "session" ? "5 hours" : w.kind === "weekly" ? "Week" : w.label))
++            .child(div().w(62).flex_none().truncate().text_size(12).text_color(r.sub).child(w.kind === "session" ? "5 hours" : w.kind === "weekly" ? "Week" : w.kind === "credits" ? "Spend cap" : w.label))
+             .child(bar(w, 120, 5, now, t, o.remaining, r))
+             .child(div().flex_1().text_right().text_size(12).text_color(w.percentUsed >= 60 ? level(w.percentUsed, r) : t.foreground).child(`${Math.round(percent(w, o.remaining))}%`)))
+           .child(div().pl(70).text_size(11).text_color(r.hint).child([
+             w.resetsAt && Date.parse(w.resetsAt) > now ? `resets in ${until(w.resetsAt, now)}` : null,
++            spend(w),
+             pc ? (Math.abs(pc.diff) < 5 ? "on pace" : pc.diff > 0 ? `${pc.diff}% ahead of pace` : `${-pc.diff}% under pace`) : null,
+           ].filter(Boolean).join(" · ")));
+       })));
+@@ -237,6 +280,8 @@
+         .child(div().id("quota-refresh").px(6).rounded(5).cursor_pointer().text_size(11).text_color(r.sub).hover(s => s.bg(t.hover))
+           .on_click((_event, cx) => this.refresh(cx)).child("Refresh")))
+       .child(div().px(8).py(4).text_size(11).text_color(r.sub).child(`Machine: ${quotaMachine() ?? "This computer"}`))
++      .when(data?.retryAfter > now, el => el.child(div().px(8).py(4).text_size(11).text_color(r.warn)
++        .child(`Rate limited · next read in ${until(new Date(data.retryAfter).toISOString(), now)}`)))
+       .when(Boolean(error), el => el.child(div().px(8).py(4).text_size(11).text_color(r.fail).child(error)))
+       .children(details)
+       .child(div().mx(8).my(6).h(1).bg(t.border))
+@@ -245,8 +290,8 @@
+       .children(KINDS.map(([kind, label]) => toggle(label, o.kinds[kind], () => setOptions({ kinds: { ...o.kinds, [kind]: !o.kinds[kind] } }), `kind-${kind}`)))
+       .child(div().mx(8).my(6).h(1).bg(t.border))
+       .child(heading("Providers"))
+-      .children(all.map(p => toggle(p.label, !o.hidden.includes(p.id),
+-        () => setOptions({ hidden: o.hidden.includes(p.id) ? o.hidden.filter(x => x !== p.id) : [...o.hidden, p.id] }), `prov-${p.id}`)))
++      .children(all.map(p => toggle(p.title, !o.hidden.includes(p.key),
++        () => setOptions({ hidden: o.hidden.includes(p.key) ? o.hidden.filter(x => x !== p.key) : [...o.hidden, p.key] }), `prov-${p.key}`)))
+       .when(all.some(p => p.id === "agy"), el => el.child(toggle("Antigravity: Claude/GPT limits", o.agyClaudeGpt !== false,
+         () => setOptions({ agyClaudeGpt: o.agyClaudeGpt === false }), "agy-claude-gpt")))
+       .child(toggle("Signed-out providers", o.signedOut, () => setOptions({ signedOut: !o.signedOut }), "signed-out"))
+diff -ru a/quota-command.js b/quota-command.js
+--- a/quota-command.js	2026-11-07 16:08:34
++++ b/quota-command.js	2026-11-07 16:08:34
+@@ -1,37 +1,19 @@
++// Only the providers in use: quota-axi asks each one's vendor on every read.
++const ARGS = ["--json", "--provider", "claude,codex"];
++export const QUOTA_LINE = ["quota-axi", ...ARGS].join(" ");
++
+ // npm installs a .cmd shim on Windows, which cannot be spawned as a native executable.
+ // Keep exec injectable so the fallback and machine forwarding can be checked without Herdr.
+ export async function runQuotaCommand(exec, options = {}) {
+   try {
+-    return await exec("quota-axi", ["--json"], options);
++    return await exec("quota-axi", ARGS, options);
+   } catch (startError) {
+     try {
+       // Fixed command only: never interpolate paths, credentials or caller arguments into cmd.
+-      return await exec("cmd.exe", ["/d", "/s", "/c", "quota-axi --json"], options);
++      return await exec("cmd.exe", ["/d", "/s", "/c", QUOTA_LINE], options);
+     } catch {
+       // On Unix, let the existing login-shell fallback handle PATH discovery.
+       throw startError;
+     }
+-  }
+-}
+-
+-// quota-axi cannot read a gh login kept in the system credential store (Windows), so a signed-in Copilot can come
+-// back with no windows. gh itself can read it. Read-only: the token stays inside gh and never reaches this code.
+-export function parseCopilot(stdout) {
+-  const user = JSON.parse(stdout);
+-  return Object.entries(user.quota_snapshots ?? {})
+-    .filter(([, q]) => q && !q.unlimited && Number.isFinite(q.percent_remaining))
+-    .map(([id, q]) => ({
+-      id, label: id.replace(/_/g, " "), kind: "monthly", shareOf: null,
+-      percentUsed: 100 - q.percent_remaining, resetsAt: user.quota_reset_date_utc ?? null, windowSeconds: null,
+-    }));
+-}
+-
+-// Null when gh is missing, signed out or answers with something else: the provider then stays as quota-axi left it.
+-export async function copilotWindows(exec) {
+-  try {
+-    const r = await exec("gh", ["api", "/copilot_internal/user"]);
+-    return r.code === 0 ? parseCopilot(r.stdout) : null;
+-  } catch {
+-    return null;
+   }
+ }

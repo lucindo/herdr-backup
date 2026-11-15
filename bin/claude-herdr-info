@@ -1,0 +1,41 @@
+#!/bin/bash
+# Claude Code hook for Herdr: puts model, effort and context usage in Herdr's pane header
+# (the `pane-plus` mod reads the terminal label `claude.info`). Runs from SessionStart,
+# PostToolUse and Stop hooks instead of a status line, which would cost Claude Code a row.
+# Reads the last main-thread response in the session transcript; prints nothing.
+[ -n "${HC_TERMINAL_ID:-}" ] || exit 0
+input=$(cat)
+
+transcript=$(jq -r 'if .agent_id then empty else .transcript_path // empty end' <<<"$input") || exit 0
+[ -n "$transcript" ] || exit 0
+
+settings="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+cfg_effort=$(jq -r '.effortLevel // empty' "$settings" 2>/dev/null)
+
+# The transcript does not record the context window, so known sizes come from what Claude Code's
+# status line reported (context_window_size); other models show tokens only.
+info=$(tail -n 300 "$transcript" 2>/dev/null | jq -rs --arg env_effort "${CLAUDE_CODE_EFFORT_LEVEL:-}" --arg cfg_effort "$cfg_effort" '
+  def tok: if . >= 1000000 then ((. / 100000 | round) / 10 | tostring) + "m"
+           elif . >= 1000 then (. / 1000 | round | tostring) + "k"
+           else tostring end;
+  def windows: { "claude-opus-5-5": 1000000 };
+  # claude-opus-5-5 -> Opus 5.5; a trailing date (-20250514) is dropped.
+  def pretty: sub("^claude-"; "") | split("-") | map(select(test("^[0-9]{8}$") | not))
+    | (map(select(test("^[a-z]")) | (.[:1] | ascii_upcase) + .[1:]) | join(" ")) as $name
+    | (map(select(test("^[0-9]+$"))) | join(".")) as $version
+    | [$name, $version] | map(select(. != "")) | join(" ");
+  map(select(.type == "assistant" and (.isSidechain | not) and .message.usage != null and .message.model != null))
+  | last // empty
+  | (.message.usage | (.input_tokens // 0) + (.cache_creation_input_tokens // 0) + (.cache_read_input_tokens // 0)) as $used
+  | (windows[.message.model]) as $size
+  | ([.effort, $env_effort, $cfg_effort] | map(select(. != null and . != "")) | first) as $effort
+  | [(.message.model | pretty), $effort,
+     (if $size then "\($used | tok)/\($size | tok) \($used * 100 / $size | floor)%" else ($used | tok) end)]
+  | map(select(. != null)) | join(" · ")
+' 2>/dev/null) || exit 0
+
+# Only tell Herdr when the text changes; an empty text (a new session, no reply yet) clears the label.
+state="${TMPDIR:-/tmp}/claude-herdr-info.${HC_SCOPE:-scope}.$HC_TERMINAL_ID"
+[ -f "$state" ] && [ "$(cat "$state")" = "$info" ] && exit 0
+hc label "$HC_TERMINAL_ID" "claude.info=$info" >/dev/null 2>&1 && printf '%s' "$info" >"$state"
+exit 0
