@@ -15,7 +15,7 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 | `layouts/main-plus.json` | Clone of Herdr's `main`; the status block is a row: `workspace-status` 1.6, `system` 1.6, `quota` 3.1; pane header mod `pane-plus`; right panel `better-files` / `better-changes` |
 | `mods/quota/` | The quota mod as installed (modified) |
 | `mods/system/` | The system load mod as installed (upstream, unchanged) |
-| `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text |
+| `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text and mods' `pane-heads` titles and controls |
 | `mods/reviewer/` | Symlink to the code-review pane in `src/herdr-app-reviewer`; toggled with `cmd-r` |
 | `src/herdr-app-reviewer/` | Submodule: lucindo/herdr-app-reviewer, a fork of gfronza/herdr-app-reviewer, pinned to the installed commit |
 | `mods/better-files/`, `mods/better-changes/` | File browser and Git panel from munza/herdr-mods (`8606260`), in `main-plus`'s right panel; Better Changes' `mod.json` sets `limits.files: 300` |
@@ -25,7 +25,7 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 | `themes/catppuccin-frappe.json` | The app theme (`settings.json` `"theme"`), with panel colors pinned to Frappé |
 | `bin/claude-herdr-info` | Claude Code hook that feeds the header; installed at `~/.local/bin/` |
 | `quota.patch` | Upstream `mods/quota` → installed, `patch -p1` |
-| `pane-plus.patch` | Herdr's `mods/pane/main.js` → `pane-plus` |
+| `pane-plus.patch` | Herdr's `mods/pane/main.js` 0.1.13 (the version cloned; Herdr's has changed since) → `pane-plus` |
 | `upstream/` | Upstream `RECIPE.md`, `README.md` and previews, for rebuilding from scratch |
 
 ## Requirements
@@ -123,6 +123,23 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 
   with `H` = `{ "type": "command", "command": "/Users/lucindo/.local/bin/claude-herdr-info", "timeout": 5, "async": true }`.
 - Updates after each tool call and at turn end; `/model` and `/effort` show from the next request.
+
+## Mod titles and controls in the pane header
+
+Added 2026-11-16: `mods/pane-plus` also shows what a mod pane publishes under its pane id in the
+shared key `pane-heads`.
+
+- `title`, `icon` (`color: true` for a full-colour picture) and `detail` replace the pane's name
+  and folder; `badge` is a highlighted label after them.
+- `actions` are buttons on the right: `{ command, label or icon, tooltip, selected, gap }`. A
+  click focuses the pane, then runs `command`. Herdr delivers a mod command such as
+  `reviewer.scope-branch` only to the focused copy of that mod, so the focus has to come first.
+  While the pointer is on the header, a 1 px line separates them from the split, zoom and close
+  buttons.
+- On start it adds `pane-plus` to the shared list `pane-heads-actions`, which tells a mod that
+  this header draws its controls.
+- The reviewer publishes its scopes and toggles there (fork branch `feat/header-controls`, not in
+  the pinned commit yet). Better Files and Better Changes tabs publish their file.
 
 ## Reviewer pane
 
@@ -227,11 +244,9 @@ change is the `settings` block in `mods/better-changes/mod.json` (see Watch out)
   version that worked — interrupted" and stays on "Loading changes…". It counts every untracked
   file (`--untracked-files=all`): a repo with 2,197 untracked files failed at the default
   `limits.files` 1,000 and worked at 500, so it is set to 300 for headroom.
-- Diff and file tabs have two header rows: `pane-plus`, then the mod's own file row. One row
-  needs the mods' own pane header (`better-changes`), which has no Claude info; using `pane-plus`
-  instead would mean reading `shared("pane-heads")` in it and patching the
-  `=== "better-changes"` header check in `better-files/views/viewer.js` and
-  `better-changes/views/diff.js`.
+- Diff and file tabs have two header rows: `pane-plus`, which shows the file from `pane-heads`,
+  then the mod's own file row. Dropping that row means patching the `=== "better-changes"`
+  header check in `better-files/views/viewer.js` and `better-changes/views/diff.js`.
 - To update: re-clone, `diff -r` each `mods/<name>` against this copy, check new `exec`, `hc`
   and `run` calls, then replace both. Copying a new `mod.json` drops `limits.files`; Better
   Config offers to restore it.
