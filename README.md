@@ -131,11 +131,11 @@ shared key `pane-heads`.
 
 - `title`, `icon` (`color: true` for a full-colour picture) and `detail` replace the pane's name
   and folder; `badge` is a highlighted label after them.
-- `actions` are buttons on the right: `{ command, label or icon, tooltip, selected, gap }`. A
+- `actions` are buttons after the title: `{ command, label or icon, tooltip, selected, gap }`. A
   click focuses the pane, then runs `command`. Herdr delivers a mod command such as
   `reviewer.scope-branch` only to the focused copy of that mod, so the focus has to come first.
-  While the pointer is on the header, a 1 px line separates them from the split, zoom and close
-  buttons.
+  The badge and folder come after them; the folder shrinks to make room for the split, zoom and
+  close buttons on hover, so the controls never move.
 - On start it adds `pane-plus` to the shared list `pane-heads-actions`, which tells a mod that
   this header draws its controls.
 - The reviewer publishes its scopes and toggles there (fork branch `feat/header-controls`, not in
