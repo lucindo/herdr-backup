@@ -1,0 +1,3 @@
+[submodule "src/herdr-app-reviewer"]
+	path = src/herdr-app-reviewer
+	url = https://github.com/lucindo/herdr-app-reviewer.git

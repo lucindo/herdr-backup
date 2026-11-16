@@ -16,7 +16,8 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 | `mods/quota/` | The quota mod as installed (modified) |
 | `mods/system/` | The system load mod as installed (upstream, unchanged) |
 | `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text |
-| `mods/reviewer/` | Code-review pane from gfronza/herdr-app-reviewer (`71eb4b5`), unchanged; toggled with `cmd-r` |
+| `mods/reviewer/` | Symlink to the code-review pane in `src/herdr-app-reviewer`; toggled with `cmd-r` |
+| `src/herdr-app-reviewer/` | Submodule: lucindo/herdr-app-reviewer, a fork of gfronza/herdr-app-reviewer, pinned to the installed commit |
 | `mods/better-files/`, `mods/better-changes/` | File browser and Git panel from munza/herdr-mods (`8606260`), in `main-plus`'s right panel; Better Changes' `mod.json` sets `limits.files: 300` |
 | `mods/better-config/` | Settings dialog for every mod with settings (same source), `cmd-alt-,` |
 | `mods/better-icons/` | Material Icon Theme icons used by Better Files and Better Changes (same source) |
@@ -36,12 +37,19 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 
 ## Restore
 
+Clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an
+existing clone: the reviewer lives in a submodule.
+
 ```sh
 H=~/.config/herdr-app
 # Layout first: better-changes has "place": "right", and Herdr docks a copy of a mod it has
 # never seen into the shown layout unless a layout already uses it.
 cp layouts/main-plus.json "$H/layouts/"
-cp -R mods/quota mods/system mods/pane-plus mods/reviewer "$H/mods/"   # check they don't exist first
+cp -R mods/quota mods/system mods/pane-plus "$H/mods/"   # check they don't exist first
+# The reviewer runs from a working clone of the fork (see Reviewer pane).
+# For a plain copy instead: cp -RL mods/reviewer "$H/mods/"
+git clone git@github.com:lucindo/herdr-app-reviewer.git ~/Code/herdr-app-reviewer   # if not there yet
+ln -s ~/Code/herdr-app-reviewer/mods/reviewer "$H/mods/reviewer"
 cp -R mods/better-icons mods/better-config mods/better-files mods/better-changes "$H/mods/"
 cp themes/catppuccin-frappe.json "$H/themes/"     # settings.json: "theme": "catppuccin-frappe"
 install -m 755 bin/claude-herdr-info ~/.local/bin/
@@ -118,10 +126,14 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 
 ## Reviewer pane
 
-`mods/reviewer` is [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer)
-at commit `71eb4b545d6da745af1efa5358a1e8c1fb356e09` (2026-11-14), copied as is (MIT). Only the
-mod folder is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for
-developing it. Herdr adds its own `gpui-kit.d.ts` to the installed folder; it isn't backed up.
+`mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
+[lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
+[gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
+`246496c9345e3b51d82921cf12a2170dd2fa4bcc` (2026-11-16). On this computer the installed
+`~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
+`~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
+is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
+Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore` leaves it out.
 
 - `cmd-r` (in `keys.json` `"global"`, after `cmd-p`) opens a pane right of the focused pane,
   bound to that pane's folder, listing its uncommitted changes as a diff; `cmd-r` again closes it.
@@ -135,9 +147,10 @@ developing it. Herdr adds its own `gpui-kit.d.ts` to the installed folder; it is
   (Shift+Enter marks a run's first end). `o` (This session) narrows any scope to the files the
   agents' turns changed since the pane opened. Comments belong to the scope they were made in.
 - The diff views run only read-only `git` (`status`, `diff`, `ls-files`, `rev-parse`,
-  `merge-base`, `log`, `for-each-ref`, `cat-file` for rendering Markdown at a commit, `config` to
-  read `init.defaultBranch`, and `hash-object -t tree /dev/null` without `-w` for a root commit's
-  empty tree), with `--no-optional-locks`, no index refresh; no network. Shared-state keys:
+  `symbolic-ref` for each repo's branch name, `merge-base`, `log`, `for-each-ref`, `cat-file`
+  for rendering Markdown at a commit, `config` to read `init.defaultBranch`, and
+  `hash-object -t tree /dev/null` without `-w` for a root commit's empty tree), with
+  `--no-optional-locks`, no index refresh; no network. Shared-state keys:
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
   repo), `reviewer.files` (tree or flat) and `reviewer.diff` (unified or split).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
@@ -163,8 +176,13 @@ developing it. Herdr adds its own `gpui-kit.d.ts` to the installed folder; it is
   Markdown, find, file and code search). Re-audited: `vendor/` unchanged, new programs only in
   `turns.js` as above, app commands unchanged (`pane.split`, `pane.focus`, `pane.close`,
   `terminal.paste`), and the repo's 151 tests pass.
-- To update: re-clone, `diff -r` its `mods/reviewer` against this copy, check new `exec`/`run`
-  calls, then replace both (keep `gpui-kit.d.ts` in the installed one).
+- Updated 2026-11-16 from `71eb4b5` (branch name per watched repo) and moved to the submodule.
+  Re-audited: one new command, `git symbolic-ref --quiet --short HEAD` with the read-only flags
+  above; `vendor/` and app commands unchanged; the repo's 152 tests pass.
+- To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
+  symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
+  `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
+  `git add src/herdr-app-reviewer` and commit. Pin only pushed commits, or a restore can't fetch them.
 
 ## Better mods
 
