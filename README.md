@@ -129,7 +129,7 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`246496c9345e3b51d82921cf12a2170dd2fa4bcc` (2026-11-16). On this computer the installed
+`0bb84b3aa2624106a418768664b3462b7fab3b38` (2026-11-16). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -142,13 +142,14 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   file list, `m` rendered Markdown, `/` `n` `N` find in the diff, `p` go to a file, `P` search
   changed lines. Full key list in its README.
 - Scopes: `u` uncommitted (the default in every new pane), `b` the branch against its base (a
-  local branch: `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`), `t` the
-  agent's last turn, `g` one commit or a run. `B` picks the base, `G` picks commits
-  (Shift+Enter marks a run's first end). `o` (This session) narrows any scope to the files the
+  local branch: the one the branch was made from, as the reflog recorded it, `origin/dev`
+  counting as `dev`; else `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`),
+  `t` the agent's last turn, `g` one commit or a run. `B` picks the base ("Forget the pick" at
+  the top of its list drops it), `G` picks commits (Shift+Enter marks a run's first end). `o` (This session) narrows any scope to the files the
   agents' turns changed since the pane opened. Comments belong to the scope they were made in.
 - The diff views run only read-only `git` (`status`, `diff`, `ls-files`, `rev-parse`,
-  `symbolic-ref` for each repo's branch name, `merge-base`, `log`, `for-each-ref`, `cat-file`
-  for rendering Markdown at a commit, `config` to read `init.defaultBranch`, and
+  `symbolic-ref` for each repo's branch name, `reflog show` for the branch's source,
+  `merge-base`, `log`, `for-each-ref`, `cat-file` for rendering Markdown at a commit, `config` to read `init.defaultBranch`, and
   `hash-object -t tree /dev/null` without `-w` for a root commit's empty tree), with
   `--no-optional-locks`, no index refresh; no network. Shared-state keys:
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
@@ -179,6 +180,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
 - Updated 2026-11-16 from `71eb4b5` (branch name per watched repo) and moved to the submodule.
   Re-audited: one new command, `git symbolic-ref --quiet --short HEAD` with the read-only flags
   above; `vendor/` and app commands unchanged; the repo's 152 tests pass.
+- Updated 2026-11-16 from `246496c` (branch base from where the branch was made, "Forget the
+  pick"). Re-audited: one new command, `git reflog show --format=%gs <ref> --` with the
+  read-only flags above; no new shared-state key; `vendor/` and app commands unchanged; the
+  repo's 156 tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
