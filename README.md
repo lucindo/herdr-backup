@@ -6,6 +6,8 @@ Claude session's model, effort and context usage; plus the mods and the Claude C
 Added 2026-11-13: the `reviewer` pane (see [Reviewer pane](#reviewer-pane)).
 Added 2026-11-15, removed 2026-11-17: four Better mods from munza/herdr-mods. The right panel is
 back to Herdr's own Files and Changes.
+Changed 2026-11-17: the pane headers come from `pane-header` (see [Pane header](#pane-header)),
+which replaces `pane-plus`.
 
 Source: [Lakris2407/herdr-mods `quota/`](https://github.com/Lakris2407/herdr-mods/tree/main/quota)
 at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged from upstream;
@@ -13,16 +15,16 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 
 | Path | What it is |
 |---|---|
-| `layouts/main-plus.json` | Clone of Herdr's `main`; the status block is a row: `workspace-status` 1.6, `system` 1.6, `quota` 3.1; pane header mod `pane-plus`; right panel Herdr's `files` / `changes` |
+| `layouts/main-plus.json` | Clone of Herdr's `main`; the status block is a row: `workspace-status` 1.6, `system` 1.6, `quota` 3.1; pane header mod `pane-header`; right panel Herdr's `files` / `changes` |
 | `mods/quota/` | The quota mod as installed (modified) |
 | `mods/system/` | The system load mod as installed (upstream, unchanged) |
-| `mods/pane-plus/` | Clone of Herdr's `pane` header, plus the Claude info text and mods' `pane-heads` titles and controls |
+| `mods/pane-header/` | Symlink to the pane header in `src/herdr-app-pane-header`: Herdr's `pane`, plus mods' titles and controls and terminals' `pane-head.*` labels |
 | `mods/reviewer/` | Symlink to the code-review pane in `src/herdr-app-reviewer`; toggled with `cmd-r` |
 | `src/herdr-app-reviewer/` | Submodule: lucindo/herdr-app-reviewer, a fork of gfronza/herdr-app-reviewer, pinned to the installed commit |
+| `src/herdr-app-pane-header/` | Submodule: lucindo/herdr-app-pane-header, pinned to the installed commit |
 | `themes/catppuccin-frappe.json` | The app theme (`settings.json` `"theme"`), with panel colors pinned to Frappé |
 | `bin/claude-herdr-info` | Claude Code hook that feeds the header; installed at `~/.local/bin/` |
 | `quota.patch` | Upstream `mods/quota` → installed, `patch -p1` |
-| `pane-plus.patch` | Herdr's `mods/pane/main.js` 0.1.13 (the version cloned; Herdr's has changed since) → `pane-plus` |
 | `upstream/` | Upstream `RECIPE.md`, `README.md` and previews, for rebuilding from scratch |
 
 ## Requirements
@@ -35,21 +37,23 @@ at commit `c0119d239968541bc77d8d4d7362d2de4d0df3e5`. `mods/system` is unchanged
 ## Restore
 
 Clone with `git clone --recurse-submodules`, or run `git submodule update --init` in an
-existing clone: the reviewer lives in a submodule.
+existing clone: the reviewer and the pane header live in submodules.
 
 ```sh
 H=~/.config/herdr-app
 cp layouts/main-plus.json "$H/layouts/"
-cp -R mods/quota mods/system mods/pane-plus "$H/mods/"   # check they don't exist first
-# The reviewer runs from a working clone of the fork (see Reviewer pane).
-# For a plain copy instead: cp -RL mods/reviewer "$H/mods/"
+cp -R mods/quota mods/system "$H/mods/"   # check they don't exist first
+# The reviewer and the pane header run from working clones (see Reviewer pane, Pane header).
+# For plain copies instead: cp -RL mods/reviewer mods/pane-header "$H/mods/"
 git clone git@github.com:lucindo/herdr-app-reviewer.git ~/Code/herdr-app-reviewer   # if not there yet
+git clone git@github.com:lucindo/herdr-app-pane-header.git ~/Code/herdr-app-pane-header
 ln -s ~/Code/herdr-app-reviewer/mods/reviewer "$H/mods/reviewer"
+ln -s ~/Code/herdr-app-pane-header/mods/pane-header "$H/mods/pane-header"
 cp themes/catppuccin-frappe.json "$H/themes/"     # settings.json: "theme": "catppuccin-frappe"
 install -m 755 bin/claude-herdr-info ~/.local/bin/
 # keys.json, under "global":  "cmd-r": "mod.open:reviewer",
-herdr-app check "$H/mods/quota" && herdr-app check "$H/mods/system" && herdr-app check "$H/mods/pane-plus"
-herdr-app check "$H/mods/reviewer"
+herdr-app check "$H/mods/quota" && herdr-app check "$H/mods/system"
+herdr-app check "$H/mods/reviewer" && herdr-app check "$H/mods/pane-header"
 herdr-app do layout.switch '{"name":"main-plus"}'
 herdr-app status                                 # "errors": []
 ```
@@ -101,12 +105,12 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 - `bin/claude-herdr-info` reads the last main-thread response in the session transcript: model
   (`message.model`, `claude-opus-5-5` → `Opus 5.5`), effort (the entry's `effort`, else
   `$CLAUDE_CODE_EFFORT_LEVEL`, else settings `effortLevel`) and context (input + cache tokens of
-  `message.usage`). It sets the terminal label `claude.info` with `hc label $HC_TERMINAL_ID`, only
+  `message.usage`). It sets the terminal label `pane-head.info` with `hc label $HC_TERMINAL_ID`, only
   when the text changes, and prints nothing. A session with no reply yet clears the label.
 - The transcript has no context window size: `windows` in the script knows `claude-opus-5-5` = 1M
   (what the old status line reported); other models show tokens only.
-- `mods/pane-plus` shows the label only while an agent reports in that pane, so a shell left after
-  Claude exits shows nothing.
+- It also sets `pane-head.while=agent`, so the header shows the label only while an agent reports
+  in that pane, and a shell left after Claude exits shows nothing.
 - It runs from hooks, not a status line: Claude Code keeps an empty row for any status line, even
   one that prints nothing or fails. Add to `hooks` in **both** settings files, beside Herdr's own
   SessionStart entry (don't replace it):
@@ -120,21 +124,28 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
   with `H` = `{ "type": "command", "command": "/Users/lucindo/.local/bin/claude-herdr-info", "timeout": 5, "async": true }`.
 - Updates after each tool call and at turn end; `/model` and `/effort` show from the next request.
 
-## Mod titles and controls in the pane header
+## Pane header
 
-Added 2026-11-16: `mods/pane-plus` also shows what a mod pane publishes under its pane id in the
-shared key `pane-heads`.
+`mods/pane-header` is a symlink into the `src/herdr-app-pane-header` submodule:
+[lucindo/herdr-app-pane-header](https://github.com/lucindo/herdr-app-pane-header) (Apache-2.0), pinned at
+`a4b146f1094f1e6a4d08c0d9f6d462086b918c0e` (2026-11-17). As with the reviewer, the installed
+`~/.config/herdr-app/mods/pane-header` is a symlink to the working clone at
+`~/Code/herdr-app-pane-header`, so the app runs whatever is checked out there.
 
-- `title`, `icon` (`color: true` for a full-colour picture) and `detail` replace the pane's name
-  and folder; `badge` is a highlighted label after them.
-- `actions` are buttons after the title: `{ command, label or icon, tooltip, selected, gap }`. A
-  click focuses the pane, then runs `command`. Herdr delivers a mod command such as
-  `reviewer.scope-branch` only to the focused copy of that mod, so the focus has to come first.
-  The badge and folder come after them; the folder shrinks to make room for the split, zoom and
-  close buttons on hover, so the controls never move.
-- On start it adds `pane-plus` to the shared list `pane-heads-actions`, which tells a mod that
-  this header draws its controls.
-- The reviewer publishes its scopes and toggles there (since `c219fda`).
+- It is Herdr's stock `pane` header as shipped in Herdr 0.1.16, plus the repo's
+  [contract](https://github.com/lucindo/herdr-app-pane-header/blob/main/CONTRACT.md): a mod pane
+  publishes a title, icon, detail, badge, info and buttons under its pane id in the shared key
+  `pane-heads`, and a program in a terminal sets `pane-head.*` labels, as the Claude info does.
+- The reviewer publishes its scopes and toggles there (since `c219fda`) and leaves out its own
+  row, because the header lists itself in `pane-heads-actions`.
+- Audited: no programs, network or file access. It reads `panes()`, `terminals()` labels,
+  `layout()` and `pane-heads`, and writes only its own entries in `pane-heads-headers` and
+  `pane-heads-actions`. Its buttons run `pane.split`, `pane.zoom` and `pane.close`; a button a
+  mod publishes runs `pane.focus`, then the command that mod names. The repo's 18 tests pass.
+- It replaced `pane-plus` on 2026-11-17: a clone of Herdr's `pane` 0.1.13 that drew `pane-heads`
+  and the old `claude.info` label. It and `pane-plus.patch` are in this repo's history at `cfb9052`.
+- To update: change and push `~/Code/herdr-app-pane-header` (the app picks it up through the
+  symlink), then move the pin as for the reviewer.
 
 ## Reviewer pane
 
@@ -171,7 +182,7 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   size, how a new pane starts, the refresh interval and the limits; it holds only values that
   differ from the default).
   It also writes its title and controls under its pane id in `pane-heads` and reads
-  `pane-heads-actions` (see [Mod titles and controls](#mod-titles-and-controls-in-the-pane-header)).
+  `pane-heads-actions` (see [Pane header](#pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
   idle → working edge of its tab's agents snapshots every watched repo, whatever the scope: it
   copies `.git/index` into `$TMPDIR/herdr-reviewer-<tab id>/turn-N/` and runs `git add -A` and
@@ -229,7 +240,7 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
 ## Theme: Catppuccin Frappé
 
 `settings.json` sets `"theme": "catppuccin-frappe"` and `main-plus` sets no theme, so every
-mod (reviewer, quota, system, pane-plus) draws with it through `theme()`. Herdr derives the
+mod (reviewer, quota, system, pane-header) draws with it through `theme()`. Herdr derives the
 panel colors from the 16 terminal colors and lands on neutral grays (panel text `#eeeeef`,
 sidebars `#212330`), so the theme file's `colors` pins them to Frappé (added 2026-11-13):
 

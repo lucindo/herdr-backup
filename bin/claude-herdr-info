@@ -1,6 +1,6 @@
 #!/bin/bash
 # Claude Code hook for Herdr: puts model, effort and context usage in Herdr's pane header
-# (the `pane-plus` mod reads the terminal label `claude.info`). Runs from SessionStart,
+# (the `pane-header` mod shows the terminal label `pane-head.info`). Runs from SessionStart,
 # PostToolUse and Stop hooks instead of a status line, which would cost Claude Code a row.
 # Reads the last main-thread response in the session transcript; prints nothing.
 [ -n "${HC_TERMINAL_ID:-}" ] || exit 0
@@ -34,8 +34,10 @@ info=$(tail -n 300 "$transcript" 2>/dev/null | jq -rs --arg env_effort "${CLAUDE
   | map(select(. != null)) | join(" · ")
 ' 2>/dev/null) || exit 0
 
-# Only tell Herdr when the text changes; an empty text (a new session, no reply yet) clears the label.
+# Only tell Herdr when the label changes; an empty text (a new session, no reply yet) removes it.
+# `pane-head.while=agent` hides it once Claude exits and leaves a shell.
+label="pane-head.info=$info"
 state="${TMPDIR:-/tmp}/claude-herdr-info.${HC_SCOPE:-scope}.$HC_TERMINAL_ID"
-[ -f "$state" ] && [ "$(cat "$state")" = "$info" ] && exit 0
-hc label "$HC_TERMINAL_ID" "claude.info=$info" >/dev/null 2>&1 && printf '%s' "$info" >"$state"
+[ -f "$state" ] && [ "$(cat "$state")" = "$label" ] && exit 0
+hc label "$HC_TERMINAL_ID" "$label" pane-head.while=agent >/dev/null 2>&1 && printf '%s' "$label" >"$state"
 exit 0

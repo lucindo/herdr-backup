@@ -98,7 +98,7 @@
                 "pane": {
                   "header": {
                     "content": {
-                      "mod": "pane-plus"
+                      "mod": "pane-header"
                     },
                     "reveal": "always",
                     "height": 30,
