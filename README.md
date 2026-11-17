@@ -146,7 +146,7 @@ shared key `pane-heads`.
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`4be3f89b8815ce865a8b2a051dfedbc5ec4abfa9` (2026-11-17). On this computer the installed
+`34d06f58e100b5b8bc7e38705b93ce13ea4832a4` (2026-11-17). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -172,8 +172,9 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
   repo), `reviewer.files` (tree or flat), `reviewer.diff` (unified or split) and `reviewer.wrap`
   (wrap long lines, toggled by the header's wrap button or the `reviewer.wrap` command; no key),
-  and `reviewer.settings` (the settings screen's other choices: all files or one, how a new pane
-  starts, the refresh interval and the limits; it holds only values that differ from the default).
+  and `reviewer.settings` (the settings screen's other choices: all files or one, the diff text
+  size, how a new pane starts, the refresh interval and the limits; it holds only values that
+  differ from the default).
   It also writes its title and controls under its pane id in `pane-heads` and reads
   `pane-heads-actions` (see [Mod titles and controls](#mod-titles-and-controls-in-the-pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
@@ -217,6 +218,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   Re-audited: no new programs or app commands (all files reads each listed file with the same
   `git diff` as one file); no new shared-state key (its choice is in `reviewer.settings`);
   `vendor/` unchanged; the repo's 188 tests pass.
+- Updated 2026-11-17 from `4be3f89` (diff text in the terminal's weight and row height, and a
+  diff text size setting, our PR #10 to gfronza). Re-audited: no new programs, app commands or
+  shared-state keys (it reads `settings()` as before; its choice is in `reviewer.settings`);
+  `vendor/` unchanged; the repo's 189 tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
