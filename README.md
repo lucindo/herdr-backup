@@ -141,7 +141,7 @@ shared key `pane-heads`.
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`34d06f58e100b5b8bc7e38705b93ce13ea4832a4` (2026-11-17). On this computer the installed
+`55dbf2452ebcc7195d75187bfc1e9ed86dc581e8` (2026-11-17). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -217,6 +217,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   diff text size setting, our PR #10 to gfronza). Re-audited: no new programs, app commands or
   shared-state keys (it reads `settings()` as before; its choice is in `reviewer.settings`);
   `vendor/` unchanged; the repo's 189 tests pass.
+- Updated 2026-11-17 from `34d06f5` (one row of the header's controls when no header draws
+  them, our PR #11 to gfronza). Re-audited: no new programs, app commands or shared-state keys
+  (it reads `layout()` and `pane-heads-actions` as before); `vendor/` unchanged; the repo's 189
+  tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
