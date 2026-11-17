@@ -137,7 +137,8 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
   publishes a title, icon, detail, badge, info and buttons under its pane id in the shared key
   `pane-heads`, and a program in a terminal sets `pane-head.*` labels, as the Claude info does.
 - The reviewer publishes its scopes and toggles there (since `c219fda`) and leaves out its own
-  row, because the header lists itself in `pane-heads-actions`.
+  row, because the header registers in `pane-heads-headers` as drawing `actions` (read by the
+  reviewer since `7aa30dc`; `pane-heads-actions` is its fallback for older headers).
 - Audited: no programs, network or file access. It reads `panes()`, `terminals()` labels,
   `layout()` and `pane-heads`, and writes only its own entries in `pane-heads-headers` and
   `pane-heads-actions`. Its buttons run `pane.split`, `pane.zoom` and `pane.close`; a button a
@@ -152,7 +153,7 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`55dbf2452ebcc7195d75187bfc1e9ed86dc581e8` (2026-11-17). On this computer the installed
+`7aa30dca9c432a4edce056ee508c12a7f5248aa8` (2026-11-17). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -182,7 +183,7 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   size, how a new pane starts, the refresh interval and the limits; it holds only values that
   differ from the default).
   It also writes its title and controls under its pane id in `pane-heads` and reads
-  `pane-heads-actions` (see [Pane header](#pane-header)).
+  `pane-heads-headers` and `pane-heads-actions` (see [Pane header](#pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
   idle → working edge of its tab's agents snapshots every watched repo, whatever the scope: it
   copies `.git/index` into `$TMPDIR/herdr-reviewer-<tab id>/turn-N/` and runs `git add -A` and
@@ -232,6 +233,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   them, our PR #11 to gfronza). Re-audited: no new programs, app commands or shared-state keys
   (it reads `layout()` and `pane-heads-actions` as before); `vendor/` unchanged; the repo's 189
   tests pass.
+- Updated 2026-11-17 from `55dbf24` (finds the header that draws its controls through the
+  `pane-heads-headers` registry, our PR #12 to gfronza). Re-audited: no new programs, app
+  commands or file access; one new shared-state key, `pane-heads-headers` (read only);
+  `vendor/` unchanged; the repo's 192 tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
