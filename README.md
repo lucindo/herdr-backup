@@ -138,15 +138,15 @@ shared key `pane-heads`.
   close buttons on hover, so the controls never move.
 - On start it adds `pane-plus` to the shared list `pane-heads-actions`, which tells a mod that
   this header draws its controls.
-- The reviewer publishes its scopes and toggles there (fork branch `feat/header-controls`, not in
-  the pinned commit yet). Better Files and Better Changes tabs publish their file.
+- The reviewer publishes its scopes and toggles there (since `c219fda`). Better Files and Better
+  Changes tabs publish their file.
 
 ## Reviewer pane
 
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`0bb84b3aa2624106a418768664b3462b7fab3b38` (2026-11-16). On this computer the installed
+`c219fda115336d3db796b81717a2f2139b223e86` (2026-11-16). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -170,7 +170,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `hash-object -t tree /dev/null` without `-w` for a root commit's empty tree), with
   `--no-optional-locks`, no index refresh; no network. Shared-state keys:
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
-  repo), `reviewer.files` (tree or flat) and `reviewer.diff` (unified or split).
+  repo), `reviewer.files` (tree or flat), `reviewer.diff` (unified or split) and `reviewer.wrap`
+  (wrap long lines, toggled by the header's wrap button or the `reviewer.wrap` command; no key).
+  It also writes its title and controls under its pane id in `pane-heads` and reads
+  `pane-heads-actions` (see [Mod titles and controls](#mod-titles-and-controls-in-the-pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
   idle → working edge of its tab's agents snapshots every watched repo, whatever the scope: it
   copies `.git/index` into `$TMPDIR/herdr-reviewer-<tab id>/turn-N/` and runs `git add -A` and
@@ -201,6 +204,10 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   pick"). Re-audited: one new command, `git reflog show --format=%gs <ref> --` with the
   read-only flags above; no new shared-state key; `vendor/` and app commands unchanged; the
   repo's 156 tests pass.
+- Updated 2026-11-16 from `0bb84b3` (header controls and line wrap, our PRs #6 and #7 to
+  gfronza). Re-audited: no new programs or app commands; new shared-state keys `pane-heads`,
+  `pane-heads-actions` (read only) and `reviewer.wrap`; `vendor/` unchanged; the repo's 169 tests
+  pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
