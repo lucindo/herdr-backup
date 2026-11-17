@@ -146,7 +146,7 @@ shared key `pane-heads`.
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`c219fda115336d3db796b81717a2f2139b223e86` (2026-11-16). On this computer the installed
+`24dbcb256ef0e663cf25bda1f4b0519d6738f093` (2026-11-17). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -157,8 +157,8 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   In the pane: `j`/`k`, `c` comment, `v` select lines, `y` copy the review, `s` paste it into
   the tab's agent (no Enter), `l` stacked / side by side, `w` old beside new, `z` tree / flat
   file list, `m` rendered Markdown, `/` `n` `N` find in the diff, `p` go to a file, `P` search
-  changed lines. Full key list in its README.
-- Scopes: `u` uncommitted (the default in every new pane), `b` the branch against its base (a
+  changed lines, `,` settings (also the header's gear). Full key list in its README.
+- Scopes: `u` uncommitted (a new pane's default unless the settings pick another), `b` the branch against its base (a
   local branch: the one the branch was made from, as the reflog recorded it, `origin/dev`
   counting as `dev`; else `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`),
   `t` the agent's last turn, `g` one commit or a run. `B` picks the base ("Forget the pick" at
@@ -171,7 +171,9 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `--no-optional-locks`, no index refresh; no network. Shared-state keys:
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
   repo), `reviewer.files` (tree or flat), `reviewer.diff` (unified or split) and `reviewer.wrap`
-  (wrap long lines, toggled by the header's wrap button or the `reviewer.wrap` command; no key).
+  (wrap long lines, toggled by the header's wrap button or the `reviewer.wrap` command; no key),
+  and `reviewer.settings` (the settings screen's other choices: how a new pane starts, the refresh
+  interval and the limits; it holds only values that differ from the default).
   It also writes its title and controls under its pane id in `pane-heads` and reads
   `pane-heads-actions` (see [Mod titles and controls](#mod-titles-and-controls-in-the-pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
@@ -180,7 +182,7 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `git write-tree` there with `GIT_INDEX_FILE` and `GIT_OBJECT_DIRECTORY` pointing at it, hooks,
   split index and clean filters (git-lfs) off. It also runs `sh`, `cp`, `find`, `mkdir` and `rm`
   on that folder only. A turn's end snapshots again, and so does every refresh (each file change,
-  and every 10 s) while the Last turn scope or This session is on. It keeps the latest turn and
+  and the refresh interval, 10 s by default) while the Last turn scope or This session is on. It keeps the latest turn and
   turns with unsent comments; a closed pane's folder is left for the system's temp cleanup.
 - **Watch out:** every snapshot rehashes all untracked files, and each turn's first one stores
   them. On the translations repo (`~/Code/books/dharma-pujadi-mimangsa`, 416 MB of untracked
@@ -208,6 +210,9 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   gfronza). Re-audited: no new programs or app commands; new shared-state keys `pane-heads`,
   `pane-heads-actions` (read only) and `reviewer.wrap`; `vendor/` unchanged; the repo's 169 tests
   pass.
+- Updated 2026-11-17 from `c219fda` (settings screen, our PR #8 to gfronza). Re-audited: no new
+  programs; one new app call, `openOverlay` for its own settings dialog; new shared-state key
+  `reviewer.settings`; `vendor/` unchanged; the repo's 178 tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
