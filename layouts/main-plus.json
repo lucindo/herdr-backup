@@ -131,14 +131,14 @@
                       "id": "files",
                       "type": "block",
                       "content": {
-                        "mod": "better-files"
+                        "mod": "files"
                       }
                     },
                     {
                       "id": "changes",
                       "type": "block",
                       "content": {
-                        "mod": "better-changes"
+                        "mod": "changes"
                       }
                     }
                   ],
