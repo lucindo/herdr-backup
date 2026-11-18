@@ -153,7 +153,7 @@ Each Claude pane's header shows `Opus 5.5 · xhigh · 362k/1m 36%` on the right,
 `mods/reviewer` is a symlink into the `src/herdr-app-reviewer` submodule:
 [lucindo/herdr-app-reviewer](https://github.com/lucindo/herdr-app-reviewer), a fork of
 [gfronza/herdr-app-reviewer](https://github.com/gfronza/herdr-app-reviewer) (MIT), pinned at
-`7aa30dca9c432a4edce056ee508c12a7f5248aa8` (2026-11-17). On this computer the installed
+`fc1cdd1d256bd7604768346627ff46275849d64e` (2026-11-18). On this computer the installed
 `~/.config/herdr-app/mods/reviewer` is a symlink to the same folder in the working clone at
 `~/Code/herdr-app-reviewer`, so the app runs whatever is checked out there. Only the mod folder
 is installed; the repo's tests, `scripts/check` and its Claude Code hooks are for developing it.
@@ -164,7 +164,12 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   In the pane: `j`/`k`, `c` comment, `v` select lines, `y` copy the review, `s` paste it into
   the tab's agent (no Enter), `l` stacked / side by side, `w` old beside new, `z` tree / flat
   file list, `a` every listed file's diff in one list, `m` rendered Markdown, `/` `n` `N` find in the diff, `p` go to a file, `P` search
-  changed lines, `,` settings (also the header's gear). Full key list in its README.
+  changed lines, `.` change the base folder (also Change on its row in the folders view; kept per
+  tab across restarts), `,` settings (also the header's gear). Full key list in its README.
+- Folder picker (Change and Add folder): the system's (Finder) by default. On this computer the
+  settings screen has it on Typed (kept in `shared.json`, which this repo doesn't hold, so pick it
+  again after a restore): a box with the open terminals' folders, recent picks and path
+  completion, and no `.DS_Store` files left in the folders Finder would browse.
 - Scopes: `u` uncommitted (a new pane's default unless the settings pick another), `b` the branch against its base (a
   local branch: the one the branch was made from, as the reflog recorded it, `origin/dev`
   counting as `dev`; else `origin/HEAD`'s name, then `init.defaultBranch`, `main`, `master`),
@@ -175,13 +180,16 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `symbolic-ref` for each repo's branch name, `reflog show` for the branch's source,
   `merge-base`, `log`, `for-each-ref`, `cat-file` for rendering Markdown at a commit, `config` to read `init.defaultBranch`, and
   `hash-object -t tree /dev/null` without `-w` for a root commit's empty tree), with
-  `--no-optional-locks`, no index refresh; no network. Shared-state keys:
+  `--no-optional-locks`, no index refresh; no network. The typed folder picker runs
+  `find -L <folder>` (one or two levels deep, 10 s timeout) to list subfolders and repos.
+  Shared-state keys:
   `reviewer.watch` (watched folders), `reviewer.layout`, `reviewer.bases` (picked base per
-  repo), `reviewer.files` (tree or flat), `reviewer.diff` (unified or split) and `reviewer.wrap`
+  repo), `reviewer.base-folder` (changed base folder per tab), `reviewer.recent-folders`
+  (folders picked before), `reviewer.files` (tree or flat), `reviewer.diff` (unified or split) and `reviewer.wrap`
   (wrap long lines, toggled by the header's wrap button or the `reviewer.wrap` command; no key),
   and `reviewer.settings` (the settings screen's other choices: all files or one, the diff text
-  size, how a new pane starts, the refresh interval and the limits; it holds only values that
-  differ from the default).
+  size, the folder picker, how a new pane starts, the refresh interval and the limits; it holds
+  only values that differ from the default).
   It also writes its title and controls under its pane id in `pane-heads` and reads
   `pane-heads-headers` and `pane-heads-actions` (see [Pane header](#pane-header)).
 - **Turn snapshots** (for Last turn and This session): while a reviewer pane is open, each
@@ -237,6 +245,12 @@ Herdr writes its own `gpui-kit.d.ts` into the mod folder; the fork's `.gitignore
   `pane-heads-headers` registry, our PR #12 to gfronza). Re-audited: no new programs, app
   commands or file access; one new shared-state key, `pane-heads-headers` (read only);
   `vendor/` unchanged; the repo's 192 tests pass.
+- Updated 2026-11-18 from `7aa30dc` (change the base folder with `.`, and a typed folder picker
+  behind a setting, our PR #13 to gfronza). Re-audited: one new command, read-only
+  `find -L <folder> -mindepth 1|2 -maxdepth 1|2 (-type d | -name .git)` with a 10 s timeout; no
+  new app commands, network or file writes (new read-only calls `home()` and `spaces()`); new
+  shared-state keys `reviewer.base-folder` and `reviewer.recent-folders`; `vendor/` unchanged;
+  the repo's 203 tests pass.
 - To update: change or sync `~/Code/herdr-app-reviewer` (the app picks it up through the
   symlink), check new `exec`/`run` calls from upstream, and push the fork. Then move the pin:
   `git -C src/herdr-app-reviewer fetch`, `git -C src/herdr-app-reviewer checkout <commit>`,
